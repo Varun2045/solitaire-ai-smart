@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { GameState, Move, Card as CardType } from '@/types/card';
+import { useState, useEffect } from 'react';
+import { GameState, Move } from '@/types/card';
 import { initializeGame, findValidMoves, getBestMove, isGameWon } from '@/utils/gameLogic';
 import { canPlaceOnTableau, canPlaceOnFoundation, getMovableCards } from '@/utils/cardUtils';
 import { Card } from './Card';
@@ -43,38 +43,35 @@ export function SolitaireGame() {
     }
   }, [gameState]);
 
-  const executeMove = useCallback((move: Move) => {
-    setGameState(prevState => {
-      const newState = { ...prevState };
-      
-      // Remove cards from source
-      if (move.from.pile === 'waste') {
-        newState.waste = newState.waste.slice(0, -1);
-      } else if (move.from.pile === 'tableau' && move.from.cardIndex !== undefined) {
-        newState.tableau[move.from.index] = [...newState.tableau[move.from.index].slice(0, move.from.cardIndex)];
-        
-        // Flip the new top card if it exists
-        const pile = newState.tableau[move.from.index];
-        if (pile.length > 0 && !pile[pile.length - 1].faceUp) {
-          pile[pile.length - 1] = { ...pile[pile.length - 1], faceUp: true };
-        }
-      }
-      
-      // Add cards to destination
-      if (move.to.pile === 'foundation') {
-        newState.foundation[move.to.index] = [...newState.foundation[move.to.index], ...move.cards];
-      } else if (move.to.pile === 'tableau') {
-        newState.tableau[move.to.index] = [...newState.tableau[move.to.index], ...move.cards];
-      }
-      
-      newState.moves++;
-      newState.score += move.to.pile === 'foundation' ? 10 : 5;
-      
-      return newState;
-    });
+  const executeMove = (move: Move) => {
+    const newState = { ...gameState };
     
+    // Remove cards from source
+    if (move.from.pile === 'waste') {
+      newState.waste.pop();
+    } else if (move.from.pile === 'tableau' && move.from.cardIndex !== undefined) {
+      newState.tableau[move.from.index] = newState.tableau[move.from.index].slice(0, move.from.cardIndex);
+      
+      // Flip the new top card if it exists
+      const pile = newState.tableau[move.from.index];
+      if (pile.length > 0 && !pile[pile.length - 1].faceUp) {
+        pile[pile.length - 1].faceUp = true;
+      }
+    }
+    
+    // Add cards to destination
+    if (move.to.pile === 'foundation') {
+      newState.foundation[move.to.index].push(...move.cards);
+    } else if (move.to.pile === 'tableau') {
+      newState.tableau[move.to.index].push(...move.cards);
+    }
+    
+    newState.moves++;
+    newState.score += 10;
+    
+    setGameState(newState);
     setSelectedCards(null);
-  }, []);
+  };
 
   const handleHint = () => {
     const bestMove = getBestMove(gameState);
@@ -111,52 +108,27 @@ export function SolitaireGame() {
     handleRestart();
   };
 
-  const handleStockClick = useCallback(() => {
-    setGameState(prevState => {
-      const newState = { ...prevState };
-      
-      if (newState.stock.length > 0) {
-        const card = { ...newState.stock[newState.stock.length - 1], faceUp: true };
-        newState.stock = newState.stock.slice(0, -1);
-        newState.waste = [...newState.waste, card];
-      } else if (newState.waste.length > 0) {
-        // Reset stock from waste
-        newState.stock = [...newState.waste].reverse().map(c => ({ ...c, faceUp: false }));
-        newState.waste = [];
-      }
-      
-      return newState;
-    });
-    setSelectedCards(null);
-  }, []);
-
-  const tryAutoMoveToFoundation = useCallback((card: CardType, fromPile: 'waste' | 'tableau', fromIndex: number, cardIndex?: number) => {
-    // Try to auto-move to foundation
-    for (let i = 0; i < gameState.foundation.length; i++) {
-      if (canPlaceOnFoundation(card, gameState.foundation[i])) {
-        executeMove({
-          from: { pile: fromPile, index: fromIndex, cardIndex },
-          to: { pile: 'foundation', index: i },
-          cards: [card],
-        });
-        toast.success('Auto-moved to foundation!');
-        return true;
-      }
+  const handleStockClick = () => {
+    const newState = { ...gameState };
+    
+    if (newState.stock.length > 0) {
+      const card = newState.stock.pop()!;
+      card.faceUp = true;
+      newState.waste.push(card);
+    } else if (newState.waste.length > 0) {
+      // Reset stock from waste
+      newState.stock = [...newState.waste].reverse().map(c => ({ ...c, faceUp: false }));
+      newState.waste = [];
     }
-    return false;
-  }, [gameState.foundation, executeMove]);
+    
+    setGameState(newState);
+  };
 
-  const handleTableauClick = useCallback((pileIndex: number, cardIndex: number) => {
+  const handleTableauClick = (pileIndex: number, cardIndex: number) => {
     const pile = gameState.tableau[pileIndex];
     const card = pile[cardIndex];
     
-    if (!card || !card.faceUp) return;
-
-    // If clicking on empty space or same pile when selected, deselect
-    if (selectedCards?.pile === 'tableau' && selectedCards.index === pileIndex) {
-      setSelectedCards(null);
-      return;
-    }
+    if (!card.faceUp) return;
 
     // If no cards selected, select this card and all below it
     if (!selectedCards) {
@@ -169,11 +141,6 @@ export function SolitaireGame() {
 
     // Try to move selected cards here
     if (selectedCards.pile === 'tableau') {
-      if (selectedCards.index === pileIndex) {
-        setSelectedCards(null);
-        return;
-      }
-      
       const sourcePile = gameState.tableau[selectedCards.index];
       const movableCards = getMovableCards(sourcePile, selectedCards.cardIndex);
       const targetCard = pile.length > 0 ? pile[pile.length - 1] : null;
@@ -184,8 +151,6 @@ export function SolitaireGame() {
           to: { pile: 'tableau', index: pileIndex },
           cards: movableCards,
         });
-      } else {
-        setSelectedCards(null);
       }
     } else if (selectedCards.pile === 'waste') {
       const wasteCard = gameState.waste[gameState.waste.length - 1];
@@ -197,57 +162,13 @@ export function SolitaireGame() {
           to: { pile: 'tableau', index: pileIndex },
           cards: [wasteCard],
         });
-      } else {
-        setSelectedCards(null);
       }
     }
-  }, [gameState.tableau, gameState.waste, selectedCards, executeMove]);
-
-  const handleTableauDoubleClick = useCallback((pileIndex: number) => {
-    const pile = gameState.tableau[pileIndex];
-    if (pile.length === 0) return;
     
-    const topCard = pile[pile.length - 1];
-    if (topCard.faceUp) {
-      tryAutoMoveToFoundation(topCard, 'tableau', pileIndex, pile.length - 1);
-    }
-  }, [gameState.tableau, tryAutoMoveToFoundation]);
+    setSelectedCards(null);
+  };
 
-  const handleEmptyTableauClick = useCallback((pileIndex: number) => {
-    if (!selectedCards) return;
-
-    if (selectedCards.pile === 'tableau') {
-      const sourcePile = gameState.tableau[selectedCards.index];
-      const movableCards = getMovableCards(sourcePile, selectedCards.cardIndex);
-      
-      // Only Kings can be placed on empty tableau piles
-      if (movableCards.length > 0 && movableCards[0].rank === 'K') {
-        executeMove({
-          from: { pile: 'tableau', index: selectedCards.index, cardIndex: selectedCards.cardIndex },
-          to: { pile: 'tableau', index: pileIndex },
-          cards: movableCards,
-        });
-      } else {
-        toast.error('Only Kings can be placed on empty tableau piles');
-        setSelectedCards(null);
-      }
-    } else if (selectedCards.pile === 'waste') {
-      const wasteCard = gameState.waste[gameState.waste.length - 1];
-      
-      if (wasteCard.rank === 'K') {
-        executeMove({
-          from: { pile: 'waste', index: 0 },
-          to: { pile: 'tableau', index: pileIndex },
-          cards: [wasteCard],
-        });
-      } else {
-        toast.error('Only Kings can be placed on empty tableau piles');
-        setSelectedCards(null);
-      }
-    }
-  }, [gameState.tableau, gameState.waste, selectedCards, executeMove]);
-
-  const handleFoundationClick = useCallback((foundationIndex: number) => {
+  const handleFoundationClick = (foundationIndex: number) => {
     if (selectedCards?.pile === 'waste') {
       const wasteCard = gameState.waste[gameState.waste.length - 1];
       const foundationPile = gameState.foundation[foundationIndex];
@@ -258,8 +179,6 @@ export function SolitaireGame() {
           to: { pile: 'foundation', index: foundationIndex },
           cards: [wasteCard],
         });
-      } else {
-        setSelectedCards(null);
       }
     } else if (selectedCards?.pile === 'tableau') {
       const pile = gameState.tableau[selectedCards.index];
@@ -272,28 +191,17 @@ export function SolitaireGame() {
           to: { pile: 'foundation', index: foundationIndex },
           cards: [card],
         });
-      } else {
-        setSelectedCards(null);
       }
     }
-  }, [gameState.waste, gameState.tableau, gameState.foundation, selectedCards, executeMove]);
-
-  const handleWasteClick = useCallback(() => {
-    if (gameState.waste.length === 0) return;
     
-    if (selectedCards?.pile === 'waste') {
-      setSelectedCards(null);
-    } else {
+    setSelectedCards(null);
+  };
+
+  const handleWasteClick = () => {
+    if (gameState.waste.length > 0) {
       setSelectedCards({ pile: 'waste', index: 0, cardIndex: 0 });
     }
-  }, [gameState.waste.length, selectedCards]);
-
-  const handleWasteDoubleClick = useCallback(() => {
-    if (gameState.waste.length === 0) return;
-    
-    const wasteCard = gameState.waste[gameState.waste.length - 1];
-    tryAutoMoveToFoundation(wasteCard, 'waste', 0);
-  }, [gameState.waste, tryAutoMoveToFoundation]);
+  };
 
   const isHighlighted = (pile: string, index: number, cardIndex?: number): boolean => {
     if (!highlightedMove) return false;
@@ -357,13 +265,13 @@ export function SolitaireGame() {
               </div>
 
               {/* Waste Pile */}
-              <div onClick={handleWasteClick} onDoubleClick={handleWasteDoubleClick} className="relative">
+              <div onClick={handleWasteClick} className="relative">
                 {gameState.waste.length > 0 ? (
                   <Card
                     card={gameState.waste[gameState.waste.length - 1]}
-                    isSelected={selectedCards?.pile === 'waste'}
                     className={cn(
-                      isHighlighted('waste', 0) && 'ring-4 ring-accent shadow-glow-gold'
+                      isHighlighted('waste', 0) && 'ring-4 ring-accent shadow-glow-gold',
+                      selectedCards?.pile === 'waste' && 'ring-4 ring-primary'
                     )}
                   />
                 ) : (
@@ -398,47 +306,30 @@ export function SolitaireGame() {
           {/* Tableau */}
           <div className="flex gap-4 justify-center">
             {gameState.tableau.map((pile, pileIndex) => (
-              <div key={pileIndex} className="relative min-h-[7rem]">
+              <div key={pileIndex} className="relative">
                 {pile.length === 0 ? (
                   <div
-                    onClick={() => handleEmptyTableauClick(pileIndex)}
-                    className={cn(
-                      "w-20 h-28 rounded-lg border-2 border-dashed border-muted",
-                      "hover:bg-muted/20 transition-all cursor-pointer",
-                      "flex items-center justify-center text-muted-foreground text-xs",
-                      isHighlighted('tableau', pileIndex) && 'ring-4 ring-accent shadow-glow-gold'
-                    )}
-                  >
-                    K
-                  </div>
+                    onClick={() => handleTableauClick(pileIndex, 0)}
+                    className="w-20 h-28 rounded-lg border-2 border-dashed border-muted hover:bg-muted/20 transition-all cursor-pointer"
+                  />
                 ) : (
-                  <div className="relative">
-                    {pile.map((card, cardIndex) => {
-                      const isSelected = selectedCards?.pile === 'tableau' &&
-                        selectedCards.index === pileIndex &&
-                        cardIndex >= selectedCards.cardIndex;
-                      
-                      return (
-                        <div
-                          key={card.id}
-                          onClick={() => handleTableauClick(pileIndex, cardIndex)}
-                          onDoubleClick={() => handleTableauDoubleClick(pileIndex)}
-                          className={cn(
-                            'absolute transition-all duration-200',
-                            isHighlighted('tableau', pileIndex, cardIndex) && 'z-10'
-                          )}
-                          style={{ top: `${cardIndex * 1.75}rem` }}
-                        >
-                          <Card
-                            card={card}
-                            isSelected={isSelected}
-                            className={cn(
-                              isHighlighted('tableau', pileIndex, cardIndex) && 'ring-4 ring-accent shadow-glow-gold'
-                            )}
-                          />
-                        </div>
-                      );
-                    })}
+                  <div className="relative space-y-[-5rem]">
+                    {pile.map((card, cardIndex) => (
+                      <div
+                        key={card.id}
+                        onClick={() => handleTableauClick(pileIndex, cardIndex)}
+                        className={cn(
+                          'relative transition-all',
+                          isHighlighted('tableau', pileIndex, cardIndex) && 'ring-4 ring-accent shadow-glow-gold',
+                          selectedCards?.pile === 'tableau' &&
+                            selectedCards.index === pileIndex &&
+                            cardIndex >= selectedCards.cardIndex &&
+                            'ring-4 ring-primary'
+                        )}
+                      >
+                        <Card card={card} />
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

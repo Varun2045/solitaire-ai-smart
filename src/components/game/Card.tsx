@@ -5,13 +5,11 @@ import { cn } from '@/lib/utils';
 interface CardProps {
   card: CardType;
   onClick?: () => void;
-  onDoubleClick?: () => void;
   draggable?: boolean;
   className?: string;
-  isSelected?: boolean;
 }
 
-export function Card({ card, onClick, onDoubleClick, draggable = false, className, isSelected = false }: CardProps) {
+export function Card({ card, onClick, draggable = false, className }: CardProps) {
   const suitSymbol = SUIT_SYMBOLS[card.suit];
   const isRed = card.color === 'red';
 
@@ -22,7 +20,7 @@ export function Card({ card, onClick, onDoubleClick, draggable = false, classNam
           'w-20 h-28 rounded-lg border-2 border-border',
           'bg-gradient-to-br from-blue-600 to-blue-800',
           'flex items-center justify-center cursor-pointer',
-          'shadow-md hover:shadow-lg transition-all duration-200',
+          'shadow-md hover:shadow-lg transition-all',
           'select-none',
           className
         )}
@@ -36,18 +34,14 @@ export function Card({ card, onClick, onDoubleClick, draggable = false, classNam
   return (
     <div
       className={cn(
-        'w-20 h-28 rounded-lg border-2',
-        'bg-card shadow-md hover:shadow-xl',
+        'w-20 h-28 rounded-lg border-2 border-gray-300',
+        'bg-card shadow-md hover:shadow-xl transition-all',
         'flex flex-col items-center justify-between p-2',
         'select-none cursor-pointer',
-        'transition-all duration-200 ease-in-out',
-        draggable && 'hover:scale-105 hover:-translate-y-1 active:scale-95',
-        isSelected && 'ring-4 ring-primary scale-105 -translate-y-2',
-        !isSelected && 'border-gray-300',
+        draggable && 'hover:scale-105 active:scale-95',
         className
       )}
       onClick={onClick}
-      onDoubleClick={onDoubleClick}
       draggable={draggable}
     >
       {/* Top rank and suit */}
