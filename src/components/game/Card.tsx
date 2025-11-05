@@ -5,11 +5,13 @@ import { cn } from '@/lib/utils';
 interface CardProps {
   card: CardType;
   onClick?: () => void;
+  onDoubleClick?: () => void;
   draggable?: boolean;
   className?: string;
+  isSelected?: boolean;
 }
 
-export function Card({ card, onClick, draggable = false, className }: CardProps) {
+export function Card({ card, onClick, onDoubleClick, draggable = false, className, isSelected = false }: CardProps) {
   const suitSymbol = SUIT_SYMBOLS[card.suit];
   const isRed = card.color === 'red';
 
@@ -20,7 +22,7 @@ export function Card({ card, onClick, draggable = false, className }: CardProps)
           'w-20 h-28 rounded-lg border-2 border-border',
           'bg-gradient-to-br from-blue-600 to-blue-800',
           'flex items-center justify-center cursor-pointer',
-          'shadow-md hover:shadow-lg transition-all',
+          'shadow-md hover:shadow-lg transition-all duration-200',
           'select-none',
           className
         )}
@@ -34,14 +36,18 @@ export function Card({ card, onClick, draggable = false, className }: CardProps)
   return (
     <div
       className={cn(
-        'w-20 h-28 rounded-lg border-2 border-gray-300',
-        'bg-card shadow-md hover:shadow-xl transition-all',
+        'w-20 h-28 rounded-lg border-2',
+        'bg-card shadow-md hover:shadow-xl',
         'flex flex-col items-center justify-between p-2',
         'select-none cursor-pointer',
-        draggable && 'hover:scale-105 active:scale-95',
+        'transition-all duration-200 ease-in-out',
+        draggable && 'hover:scale-105 hover:-translate-y-1 active:scale-95',
+        isSelected && 'ring-4 ring-primary scale-105 -translate-y-2',
+        !isSelected && 'border-gray-300',
         className
       )}
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
       draggable={draggable}
     >
       {/* Top rank and suit */}
